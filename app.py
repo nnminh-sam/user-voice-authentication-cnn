@@ -1,14 +1,13 @@
 import os
 import json
 import numpy as np
-import glob
-from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
-import data_processer as DataProcesser
+import utils.data_processer as DataProcesser
 import utils.logger as Logger
 import model.model as Model
 
