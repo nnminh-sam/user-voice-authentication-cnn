@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.models import Sequential
+from tensorflow.keras.models import Sequential
 from keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, LeakyReLU, Dropout
 from tensorflow.keras.regularizers import l2
 
@@ -50,7 +50,7 @@ from tensorflow.keras.regularizers import l2
 # ----
 
 # * Version 2
-def build_voice_auth_cnn(num_classes):
+def build_voice_auth_cnn(num_classes) -> Sequential:
     model = Sequential([
         Conv1D(32, kernel_size=3, activation=None, padding='same', kernel_regularizer=l2(0.001), input_shape=(16, 1)),
         LeakyReLU(alpha=0.1),

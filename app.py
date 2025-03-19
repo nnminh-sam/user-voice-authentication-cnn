@@ -123,7 +123,6 @@ def authenticate_user(voice_path, cnn_model, label_map_path, threshold=0.9):
         return None
 
 
-
 def main():
     DATASET_PATH: str = "dataset"
     OUTPUT_PATH: str = "output"
@@ -131,13 +130,14 @@ def main():
     TRAIN_SET_PATH: str = "features/train"
     VALIDATION_SET_PATH: str = "features/validation"
     TEST_SET_PATH: str = "features/test"
-    USAGE_TEST_PATH: str = "dataset/giang_oi/nguoi_lon_ra_o_rieng_72.bin"
+    USAGE_TEST_PATH: str = "dataset/anh_ban_than/vai_dieu_can_thiet_truoc_khi_ket_hon_00.bin"
     
     features, labels, label_map, reverse_label_map = read_data_and_extract_feature(DATASET_PATH)
 
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = split_and_save_sets(
         features, labels, TRAIN_SET_PATH, VALIDATION_SET_PATH, TEST_SET_PATH
     )
+    Logger.log(f"Test set: {X_test}")
 
     # Save the label map for later use
     os.makedirs("output", exist_ok=True)
