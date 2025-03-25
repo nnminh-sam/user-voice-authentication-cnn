@@ -36,7 +36,7 @@ setInterval(() => {
   if (buffer.length > 0) {
     const timestamp = Date.now();
     const filePath = path.join(__dirname, `data/audio_${timestamp}.bin`);
-    
+
     fs.writeFile(filePath, Buffer.concat(buffer), (err) => {
       if (err) console.error("Error writing file:", err);
       else console.log(`Saved audio to ${filePath}`);

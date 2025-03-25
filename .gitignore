@@ -2,3 +2,8 @@
 /works
 /dataset*
 /features
+
+/servers/microphone-server/node_modules
+/servers/microphone-server/data
+
+.DS_Store

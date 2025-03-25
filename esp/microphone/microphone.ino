@@ -11,10 +11,10 @@
 #define bufferLen 1024
 int16_t sBuffer[bufferLen];
 
-const char* ssid = "canhcutbietbay";   // WiFi SSID
-const char* password = "12345678900987654321";        // WiFi Password
+const char* ssid = "NHA TRO LE VAN VIET";   // WiFi SSID
+const char* password = "0902511322";        // WiFi Password
 
-const char* websocket_server_host = "192.168.184.83";
+const char* websocket_server_host = "192.168.1.87";
 const uint16_t websocket_server_port = 8888;  // <WEBSOCKET_SERVER_PORT>
 
 using namespace websockets;
