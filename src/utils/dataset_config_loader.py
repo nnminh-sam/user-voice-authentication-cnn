@@ -1,7 +1,7 @@
 import yaml
 
 
-def load_config(config_path):
+def load_config(config_path) -> dict:
     """
     Loads configuration from a YAML file.
 
