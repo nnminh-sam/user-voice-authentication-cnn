@@ -7,3 +7,5 @@
 /servers/microphone-server/data
 
 .DS_Store
+__pycache__
+model/__pycache__
