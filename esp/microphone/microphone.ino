@@ -11,15 +11,15 @@
 #define bufferLen 1024
 int16_t sBuffer[bufferLen];
 
-const char* ssid = "NHA TRO LE VAN VIET";   // WiFi SSID
-const char* password = "0902511322";        // WiFi Password
+const char* ssid = "FPT Telecom";   // WiFi SSID
+const char* password = "17092016";        // WiFi Password
 
-const char* websocket_server_host = "192.168.1.87";
+const char* websocket_server_host = "192.168.100.171";
 const uint16_t websocket_server_port = 8888;  // <WEBSOCKET_SERVER_PORT>
 
 using namespace websockets;
 WebsocketsClient client;
-bool isWebSocketConnected;
+bool isWebSocketConnected = false;
 
 void onEventsCallback(WebsocketsEvent event, String data) {
   if (event == WebsocketsEvent::ConnectionOpened) {
@@ -32,6 +32,26 @@ void onEventsCallback(WebsocketsEvent event, String data) {
     Serial.println("Got a Ping!");
   } else if (event == WebsocketsEvent::GotPong) {
     Serial.println("Got a Pong!");
+  }
+}
+
+void onMessageCallback(WebsocketsMessage message) {
+  Serial.print("Received from Server: ");
+  
+  if (message.isBinary()) {
+    // Xử lý dữ liệu nhị phân
+    const uint8_t* data = (const uint8_t*)message.data().c_str();
+    
+    // Giả sử dữ liệu gửi 1 byte (0x01)
+    int16_t receivedValue = data[0]; // Giả sử chỉ đọc 1 byte đầu tiên
+    Serial.println(receivedValue);
+
+    // Nếu bạn gửi nhiều dữ liệu (ví dụ: mảng 2 byte), xử lý như sau:
+    // int16_t receivedValue = (data[1] << 8) | data[0]; // Nếu dữ liệu là 2 byte
+  } else {
+    // Nếu dữ liệu không phải nhị phân (trong trường hợp bạn gửi chuỗi)
+    Serial.println("Received string data: ");
+    Serial.println(message.data());
   }
 }
 
@@ -73,6 +93,7 @@ void setup() {
 }
 
 void loop() {
+    client.poll(); 
 }
 
 void connectWiFi() {
@@ -90,6 +111,7 @@ void connectWiFi() {
 void connectWSServer() {
   Serial.println("Connecting to websocket");
   client.onEvent(onEventsCallback);
+  client.onMessage(onMessageCallback);
   while (!client.connect(websocket_server_host, websocket_server_port, "/")) {
     delay(500);
     Serial.println("ws...");
@@ -106,7 +128,9 @@ void micTask(void* parameter) {
   while (1) {
     esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
     if (result == ESP_OK && isWebSocketConnected) {
-      client.sendBinary((const char*)sBuffer, bytesIn);
+      client.sendBinary((const char*)sBuffer, bytesIn);  // Gửi dữ liệu nhị phân
+      vTaskDelay(5 / portTICK_PERIOD_MS);
     }
+    vTaskDelay(5 / portTICK_PERIOD_MS);
   }
 }
