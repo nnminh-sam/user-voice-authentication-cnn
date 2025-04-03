@@ -1,6 +1,6 @@
 /venv
 /works
-/dataset
+/dataset*
 /output
 
 /servers/microphone-server/node_modules

@@ -1,4 +1,4 @@
 dataset_path: "dataset"
 output_path: "output"
 model_name: "voice_identification"
-usage_test_path: "dataset/nnminh_test/audio_1741766932066.bin"
+usage_test_path: "dataset/loc/audio_1743585242064.bin"
