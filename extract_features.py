@@ -38,7 +38,7 @@ namespace audio_features {
 
 def main():
     dataset_dir = Path("dataset")
-    speakers = ["anh_ban_than", "giang_oi"]
+    speakers = ["loc", "tan"]
     features_dict = {}
     
     for speaker in speakers:
