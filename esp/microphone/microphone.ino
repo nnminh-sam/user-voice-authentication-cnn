@@ -1,6 +1,16 @@
-#include <driver/i2s.h>
 #include <WiFi.h>
+#include <driver/i2s.h>
+#include <ArduinoJson.h>
 #include <ArduinoWebsockets.h>
+
+#include <TensorFlowLite_ESP32.h>
+#include "tensorflow/lite/micro/all_ops_resolver.h"
+#include "tensorflow/lite/micro/micro_error_reporter.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/system_setup.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+
+#include "model.h"
 
 #define I2S_SD 32   // Data Output from INMP441
 #define I2S_WS 25   // Left/Right Clock
@@ -11,15 +21,85 @@
 #define bufferLen 1024
 int16_t sBuffer[bufferLen];
 
-const char* ssid = "FPT Telecom";   // WiFi SSID
-const char* password = "17092016";        // WiFi Password
+const char* ssid = "NHA TRO LE VAN VIET";   // WiFi SSID
+const char* password = "0902511322";        // WiFi Password
 
-const char* websocket_server_host = "192.168.100.171";
+const char* websocket_server_host = "192.168.1.87";
 const uint16_t websocket_server_port = 8888;  // <WEBSOCKET_SERVER_PORT>
+
+// Tensor arena size (50 KB) - may need adjustment based on model requirements
+constexpr int kTensorArenaSize = 20 * 1024;
+uint8_t tensor_arena[kTensorArenaSize];
+
+// TensorFlow Lite objects
+tflite::MicroErrorReporter micro_error_reporter;
+tflite::AllOpsResolver resolver;
+const tflite::Model* model;
+tflite::MicroInterpreter* interpreter;
+TfLiteTensor* input;
+TfLiteTensor* output;
 
 using namespace websockets;
 WebsocketsClient client;
 bool isWebSocketConnected = false;
+
+// ----
+
+void setupModel() {
+    // Load the model from flash memory
+    model = tflite::GetModel(voice_identification);
+    if (model->version() != TFLITE_SCHEMA_VERSION) {
+        Serial.println("Model schema mismatch!");
+        return;
+    }
+
+    // Initialize interpreter with corrected error reporter
+    interpreter = new tflite::MicroInterpreter(model, resolver, tensor_arena, kTensorArenaSize, &micro_error_reporter);
+
+    // Allocate tensors
+    TfLiteStatus allocate_status = interpreter->AllocateTensors();
+    if (allocate_status != kTfLiteOk) {
+        Serial.println("AllocateTensors() failed - increase kTensorArenaSize if this persists");
+        return;
+    }
+
+    // Optional: Check how much of the tensor arena is used
+    Serial.print("Tensor arena used bytes: ");
+    Serial.println(interpreter->arena_used_bytes());
+
+    // Get pointers to input and output tensors
+    input = interpreter->input(0);
+    output = interpreter->output(0);
+}
+
+void predict(const float* features, size_t feature_size, const char* message) {
+    Serial.println(message);
+
+    // Copy features into the input tensor (assuming float32 input)
+    for (size_t i = 0; i < feature_size; ++i) {
+        input->data.f[i] = features[i];
+    }
+
+    // Run inference
+    if (interpreter->Invoke() != kTfLiteOk) {
+        Serial.println("Invoke failed");
+        return;
+    }
+
+    // Interpret output (assuming two classes: "Anh ban than" and "Giang oi")
+    float prob_anh_ban_than = output->data.f[0];
+    float prob_giang_oi = output->data.f[1];
+    if (prob_anh_ban_than > prob_giang_oi) {
+        Serial.println("Predicted: Anh ban than");
+    } else {
+        Serial.println("Predicted: Giang oi");
+    }
+    Serial.print("Probabilities - Anh ban than: ");
+    Serial.print(prob_anh_ban_than);
+    Serial.print(", Giang oi: ");
+    Serial.println(prob_giang_oi);
+    Serial.println();
+}
 
 void onEventsCallback(WebsocketsEvent event, String data) {
   if (event == WebsocketsEvent::ConnectionOpened) {
@@ -37,21 +117,32 @@ void onEventsCallback(WebsocketsEvent event, String data) {
 
 void onMessageCallback(WebsocketsMessage message) {
   Serial.print("Received from Server: ");
-  
-  if (message.isBinary()) {
-    // Xử lý dữ liệu nhị phân
-    const uint8_t* data = (const uint8_t*)message.data().c_str();
-    
-    // Giả sử dữ liệu gửi 1 byte (0x01)
-    int16_t receivedValue = data[0]; // Giả sử chỉ đọc 1 byte đầu tiên
-    Serial.println(receivedValue);
 
-    // Nếu bạn gửi nhiều dữ liệu (ví dụ: mảng 2 byte), xử lý như sau:
-    // int16_t receivedValue = (data[1] << 8) | data[0]; // Nếu dữ liệu là 2 byte
+  StaticJsonDocument<1024> doc;
+  DeserializationError error = deserializeJson(doc, message.data());
+
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  float featureVector[16];
+  int index = 0;
+  if (doc.is<JsonArray>()) {
+    JsonArray array = doc.as<JsonArray>();
+    Serial.println("vector of 16");
+    for (JsonVariant value : array) {
+      float num = value.as<float>();
+      Serial.print(num, 6);
+      Serial.print(", ");
+      featureVector[index] = num;
+      index++;
+    }
+    Serial.println();
+    predict(featureVector, 16, "Predicting using [recevied] features");
   } else {
-    // Nếu dữ liệu không phải nhị phân (trong trường hợp bạn gửi chuỗi)
-    Serial.println("Received string data: ");
-    Serial.println(message.data());
+    Serial.println("Received data is not an array");
   }
 }
 
@@ -87,6 +178,7 @@ void i2s_setpin() {
 void setup() {
   Serial.begin(115200);
 
+  setupModel();
   connectWiFi();
   connectWSServer();
   xTaskCreatePinnedToCore(micTask, "micTask", 10000, NULL, 1, NULL, 1);

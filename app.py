@@ -2,11 +2,7 @@ import argparse
 import os
 import tensorflow as tf
 
-from src.core import (
-    process_dataset,
-    train_model,
-    predict_data,
-)
+from src.core import process_dataset, train_model, predict_data, main as core_main
 
 from src.utils.dataset_config_loader import load_config
 
@@ -132,4 +128,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    core_main()

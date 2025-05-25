@@ -1,4 +1,0 @@
-dataset_path: "dataset"
-output_path: "output"
-model_name: "voice_identification"
-usage_test_path: "dataset/loc/audio_1743585242064.bin"

@@ -6,6 +6,7 @@ const app = express();
 
 const WS_PORT = process.env.WS_PORT || 8888;
 const HTTP_PORT = process.env.HTTP_PORT || 8000;
+const EXTRACTING_FEATURE_SERVER_PORT = process.env.EXTRACTING_FEATURE_SERVER_PORT || 8001;
 
 const wsServer = new WebSocket.Server({ port: WS_PORT }, () =>
   console.log(`WS server is listening at ws://localhost:${WS_PORT}`)
@@ -27,15 +28,31 @@ function processFileAndSendBack(filePath) {
 
     console.log("Read file data:", data);
 
-    const processedData = processData(data); // denoise
-
-    // Gửi lại dữ liệu đã xử lý cho ESP32 nếu có kết nối
-    if (esp32Client && esp32Client.readyState === WebSocket.OPEN) {
-      console.log("Sending processed data back to ESP32");
-      esp32Client.send(processedData);
-    } else {
-      console.log("ESP32 client is not connected.");
-    }
+    fetch(`http://localhost:${EXTRACTING_FEATURE_SERVER_PORT}/extract_features`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json", // Ensure this matches the payload
+      },
+      body: JSON.stringify({ // Convert the object to a JSON string
+        audio: filePath, // Send the file path as a string
+        sample_rate: 16000,
+      })
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json(); // Parse the response as JSON
+    }).then((data) => {
+      console.log("Received response from Extracting feature server:", JSON.stringify(data.feature_vector));
+      if (esp32Client && esp32Client.readyState === WebSocket.OPEN) {
+        console.log("Sending processed data back to ESP32");
+        esp32Client.send(JSON.stringify(data.feature_vector));
+      } else {
+        console.log("ESP32 client is not connected.");
+      }
+    }).catch((error) => {
+      console.error("Error fetching from Extracting feature server:", error);
+    });
   });
 }
 
@@ -45,15 +62,7 @@ wsServer.on("connection", (ws, req) => {
   const clientIP = req.socket.remoteAddress;
   console.log("New client connected from IP:", clientIP);
 
-  // Lấy phần IP từ địa chỉ IPv6-mapped IPv4 address
-  const formattedIP = clientIP.replace("::ffff:", "");
-
-  // Kiểm tra IP của client (nếu là ESP32, ví dụ ESP32 có IP 192.168.100.113)
-  // check IP ESP32 first
-  if (formattedIP === '192.168.100.113') {
-    console.log("This is ESP32 client");
-    esp32Client = ws;
-  }
+  esp32Client = ws;
 
   ws.on("message", (data) => {
     buffer.push(data); // Store data in buffer
@@ -72,7 +81,7 @@ wsServer.on("connection", (ws, req) => {
 setInterval(() => {
   if (buffer.length > 0) {
     const timestamp = Date.now();
-    const filePath = path.join(__dirname, `data/audio_${timestamp}.bin`);
+    const filePath = path.join(__dirname, `../data/audio_${timestamp}.bin`);
 
     fs.writeFile(filePath, Buffer.concat(buffer), (err) => {
       if (err) console.error("Error writing file:", err);
@@ -84,7 +93,7 @@ setInterval(() => {
 
     buffer = []; // Clear buffer after writing
   }
-}, 10000); // Every 10 seconds
+}, 1000); // Every 10 seconds
 
 // HTTP stuff
 app.use("/image", express.static("image"));

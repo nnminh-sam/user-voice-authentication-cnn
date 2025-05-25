@@ -1,15 +1,19 @@
 import os
 import json
 import time
+import random
 import numpy as np
 import tensorflow as tf
+from pathlib import Path
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Optional
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
-import src.model.model as Models
+import src.models.model as Models
+
+# import src.model.model as Models
 import src.utils.logger as Logger
 from src.utils.logger import LogLevel
 import src.utils.data_processer as DataProcesser
@@ -344,7 +348,7 @@ def train_model(
         X_train,
         y_train,
         validation_data=(X_val, y_val),
-        epochs=100,
+        epochs=200,
         batch_size=32,
         callbacks=callbacks,
     )
@@ -370,7 +374,7 @@ def train_model(
 
     # Convert Keras model to a TensorFlow Lite model
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_SIZE]
     tflite_model = converter.convert()
 
     tflite_model_path = f"{model_output_path}/{model_name}.tflite"
@@ -390,7 +394,7 @@ def predict_data(
     voice_data_path: str,
     cnn_model: tf.keras.Model,
     dataset_path: str,
-    threshold: float = 0.9,
+    threshold: float = 0.8,
 ) -> Optional[str]:
     """Authenticates user voice data using the trained CNN model.
 
@@ -425,6 +429,11 @@ def predict_data(
     prediction_time = end_time - start_time
     Logger.log(f"Voice prediction time: {prediction_time:.4f} seconds")
 
+    Logger.log(f"Prediction Threshold: {threshold}")
+    Logger.log(f"Predictions: {predictions}")
+    Logger.log(f"Predictions shape: {predictions.shape}")
+    Logger.log(f"Predictions dtype: {predictions.dtype}")
+
     predicted_index = np.argmax(predictions)
     confidence = np.max(predictions)
 
@@ -443,7 +452,7 @@ def predict_data(
 
 
 def main():
-    configs: dict = ConfigLoader.load_config("application_config.yml")
+    configs: dict = ConfigLoader.load_config("config/application_config.yml")
 
     load_dataset_from_file: bool = False
 
@@ -477,6 +486,44 @@ def main():
         cnn_model=model,
         dataset_path=configs["output_path"],
     )
+
+    # with open(f"{configs['output_path']}/dataset/label_map.json", "r") as f:
+    #     reverse_label_map = json.load(f)
+
+    # dataset_dir = Path(configs["dataset_path"])
+    # for dataset_label in dataset_dir.iterdir():
+    #     if dataset_label.is_dir():
+    #         audio_files = list(dataset_label.glob("*.bin"))
+    #         if not audio_files:
+    #             Logger.log(f"No audio files found in {dataset_label}")
+    #             continue
+
+    #         audio_file = random.choice(audio_files)
+    #         Logger.log(f"Processing {audio_file}")
+
+    #         data, sample_rate = DataProcesser.read_pcm_binary(audio_file)
+    #         Logger.log(f"Loaded file: {audio_file}")
+
+    #         feature_vector = DataProcesser.extract_features(data, sample_rate)
+    #         start_time = time.time()
+    #         predictions = model.predict(feature_vector)
+    #         end_time = time.time()
+    #         prediction_time = end_time - start_time
+    #         Logger.log(f"Voice prediction time: {prediction_time:.4f} seconds")
+
+    #         Logger.log(f"Predictions: {predictions}")
+    #         Logger.log(f"Predictions shape: {predictions.shape}")
+    #         Logger.log(f"Predictions dtype: {predictions.dtype}")
+
+    #         predicted_index = np.argmax(predictions)
+    #         confidence = np.max(predictions)
+
+    #         predicted_label = reverse_label_map[str(predicted_index)]
+
+    #         Logger.log(f"Expected result: {dataset_label}")
+    #         Logger.log(
+    #             f"Predicted result: {predicted_label} (Confidence: {confidence:.2f})"
+    #         )
 
 
 if __name__ == "__main__":
