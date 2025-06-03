@@ -322,7 +322,7 @@ def train_model(
 
     # Build model
     num_classes = len(set(labels))
-    model = Models.CNNModelV2.build(num_classes)
+    model = Models.CNNModel.build(num_classes)
     model.summary()
     model.compile(
         loss="categorical_crossentropy",
@@ -482,7 +482,17 @@ def main():
         )
 
     predict_data(
-        voice_data_path=configs["usage_test_path"],
+        voice_data_path=configs["usage_test_path_1"],
+        cnn_model=model,
+        dataset_path=configs["output_path"],
+    )
+    predict_data(
+        voice_data_path=configs["usage_test_path_2"],
+        cnn_model=model,
+        dataset_path=configs["output_path"],
+    )
+    predict_data(
+        voice_data_path=configs["usage_test_path_3"],
         cnn_model=model,
         dataset_path=configs["output_path"],
     )

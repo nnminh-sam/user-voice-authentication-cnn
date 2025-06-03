@@ -21,10 +21,10 @@
 #define bufferLen 1024
 int16_t sBuffer[bufferLen];
 
-const char* ssid = "NHA TRO LE VAN VIET";   // WiFi SSID
-const char* password = "0902511322";        // WiFi Password
+const char* ssid = "NHA TRO LE VAN VIET";  // WiFi SSID
+const char* password = "0902511322";       // WiFi Password
 
-const char* websocket_server_host = "192.168.1.87";
+const char* websocket_server_host = "192.168.1.29";
 const uint16_t websocket_server_port = 8888;  // <WEBSOCKET_SERVER_PORT>
 
 // Tensor arena size (50 KB) - may need adjustment based on model requirements
@@ -46,59 +46,59 @@ bool isWebSocketConnected = false;
 // ----
 
 void setupModel() {
-    // Load the model from flash memory
-    model = tflite::GetModel(voice_identification);
-    if (model->version() != TFLITE_SCHEMA_VERSION) {
-        Serial.println("Model schema mismatch!");
-        return;
-    }
+  // Load the model from flash memory
+  model = tflite::GetModel(voice_identification);
+  if (model->version() != TFLITE_SCHEMA_VERSION) {
+    Serial.println("Model schema mismatch!");
+    return;
+  }
 
-    // Initialize interpreter with corrected error reporter
-    interpreter = new tflite::MicroInterpreter(model, resolver, tensor_arena, kTensorArenaSize, &micro_error_reporter);
+  // Initialize interpreter with corrected error reporter
+  interpreter = new tflite::MicroInterpreter(model, resolver, tensor_arena, kTensorArenaSize, &micro_error_reporter);
 
-    // Allocate tensors
-    TfLiteStatus allocate_status = interpreter->AllocateTensors();
-    if (allocate_status != kTfLiteOk) {
-        Serial.println("AllocateTensors() failed - increase kTensorArenaSize if this persists");
-        return;
-    }
+  // Allocate tensors
+  TfLiteStatus allocate_status = interpreter->AllocateTensors();
+  if (allocate_status != kTfLiteOk) {
+    Serial.println("AllocateTensors() failed - increase kTensorArenaSize if this persists");
+    return;
+  }
 
-    // Optional: Check how much of the tensor arena is used
-    Serial.print("Tensor arena used bytes: ");
-    Serial.println(interpreter->arena_used_bytes());
+  // Optional: Check how much of the tensor arena is used
+  Serial.print("Tensor arena used bytes: ");
+  Serial.println(interpreter->arena_used_bytes());
 
-    // Get pointers to input and output tensors
-    input = interpreter->input(0);
-    output = interpreter->output(0);
+  // Get pointers to input and output tensors
+  input = interpreter->input(0);
+  output = interpreter->output(0);
 }
 
 void predict(const float* features, size_t feature_size, const char* message) {
-    Serial.println(message);
+  Serial.println(message);
 
-    // Copy features into the input tensor (assuming float32 input)
-    for (size_t i = 0; i < feature_size; ++i) {
-        input->data.f[i] = features[i];
-    }
+  // Copy features into the input tensor (assuming float32 input)
+  for (size_t i = 0; i < feature_size; ++i) {
+    input->data.f[i] = features[i];
+  }
 
-    // Run inference
-    if (interpreter->Invoke() != kTfLiteOk) {
-        Serial.println("Invoke failed");
-        return;
-    }
+  // Run inference
+  if (interpreter->Invoke() != kTfLiteOk) {
+    Serial.println("Invoke failed");
+    return;
+  }
 
-    // Interpret output (assuming two classes: "Anh ban than" and "Giang oi")
-    float prob_anh_ban_than = output->data.f[0];
-    float prob_giang_oi = output->data.f[1];
-    if (prob_anh_ban_than > prob_giang_oi) {
-        Serial.println("Predicted: Anh ban than");
-    } else {
-        Serial.println("Predicted: Giang oi");
-    }
-    Serial.print("Probabilities - Anh ban than: ");
-    Serial.print(prob_anh_ban_than);
-    Serial.print(", Giang oi: ");
-    Serial.println(prob_giang_oi);
-    Serial.println();
+  // Interpret output (assuming two classes: "Anh ban than" and "Giang oi")
+  float prob_anh_ban_than = output->data.f[0];
+  float prob_giang_oi = output->data.f[1];
+  if (prob_anh_ban_than > prob_giang_oi) {
+    Serial.println("Predicted: Anh ban than");
+  } else {
+    Serial.println("Predicted: Giang oi");
+  }
+  Serial.print("Probabilities - Anh ban than: ");
+  Serial.print(prob_anh_ban_than);
+  Serial.print(", Giang oi: ");
+  Serial.println(prob_giang_oi);
+  Serial.println();
 }
 
 void onEventsCallback(WebsocketsEvent event, String data) {
@@ -185,7 +185,7 @@ void setup() {
 }
 
 void loop() {
-    client.poll(); 
+  client.poll();
 }
 
 void connectWiFi() {

@@ -1,4 +1,6 @@
 dataset_path: "dataset"
 output_path: "output"
 model_name: "voice_identification"
-usage_test_path: "dataset/giang_oi/audio_1744089457126.bin"
+usage_test_path_1: "dataset/giang_oi/nguoi_lon_co_don_124.bin"
+usage_test_path_2: "dataset/anh_ban_than/man_cave_tour_2_74.bin"
+usage_test_path_3: "dataset/background_noise/coffee_shop_1398.bin"

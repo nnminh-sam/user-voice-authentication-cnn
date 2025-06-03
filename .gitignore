@@ -1,7 +1,8 @@
-/venv
+/venv*
 /works
 /dataset*
 /output
+/model*
 
 /servers/microphone-server/node_modules
 /servers/microphone-server/data
@@ -9,3 +10,5 @@
 .DS_Store
 __pycache__
 model/__pycache__
+
+/raw_dataset_builder/podcast_mp3*
