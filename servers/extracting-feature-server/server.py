@@ -37,28 +37,6 @@ def extract_features(data, sample_rate):
 
     # * Combine all features into a single vector
     feature_vector = np.hstack([mfcc_mean, mean_freq, std_dev, amplitude, zero_crossing_rate])
-    
-    # Try to load model and make prediction
-    # try:
-    #     # This model prediction is for testing purpose
-    #     model_path = "/Users/nnminh/Workspaces/project-voice-authentication/voice-authentication-service/model-collection/model-1/model/voice_identification.keras"
-    #     model = load_model(model_path)
-    #     prediction = model.predict(np.expand_dims(feature_vector, axis=0))
-    #     predicted_index = int(np.argmax(prediction))
-    #     confidence = float(np.max(prediction))
-    #     print("Prediction:", prediction)
-    #     print("Predicted index:", predicted_index)
-    #     print("Confidence:", confidence)
-    #     if (predicted_index == 0):
-    #         print("-------------------- Anh ban than ---------------")
-    #     elif (predicted_index == 1):
-    #         print("-------------------- background noise ---------------")
-    #     else:
-    #         print("-------------------- giang oi ---------------")
-    # except Exception as e:
-    #     predicted_index = -1
-    #     confidence = 0.0
-    #     print(f"Model prediction error: {str(e)}")
 
     return {
         "feature_vector": feature_vector.tolist(),
