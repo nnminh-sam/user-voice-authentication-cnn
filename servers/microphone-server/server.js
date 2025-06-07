@@ -14,57 +14,40 @@ const wsServer = new WebSocket.Server({ port: WS_PORT }, () =>
 );
 
 let connectedClients = [];
-let buffer = []; // Buffer to store data temporarily
-let esp32Client = null; // store esp32Client
+let buffer = [];
+let esp32Client = null;
 
-const processData = (data) => "1";
+function processFileAndSendBack(audioData) {
+  const base64Audio = audioData.toString("base64");
 
-function processFileAndSendBack(filePath) {
-  // Đọc dữ liệu từ file đã lưu
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      console.error("Error reading file:", err);
-      return;
-    }
-
-    console.log("Read file data:", data);
-
-    fetch(
-      `http://localhost:${EXTRACTING_FEATURE_SERVER_PORT}/extract_features`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json", // Ensure this matches the payload
-        },
-        body: JSON.stringify({
-          // Convert the object to a JSON string
-          audio: filePath, // Send the file path as a string
-          sample_rate: 16000,
-        }),
+  fetch(`http://localhost:${EXTRACTING_FEATURE_SERVER_PORT}/extract_features`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      audio: base64Audio,
+      sample_rate: 16000,
+    }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    )
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json(); // Parse the response as JSON
-      })
-      .then((data) => {
-        console.log(
-          "Received response from Extracting feature server:",
-          JSON.stringify(data.feature_vector)
-        );
-        if (esp32Client && esp32Client.readyState === WebSocket.OPEN) {
-          console.log("Sending processed data back to ESP32");
-          esp32Client.send(JSON.stringify(data.feature_vector));
-        } else {
-          console.log("ESP32 client is not connected.");
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching from Extracting feature server:", error);
-      });
-  });
+      return response.json();
+    })
+    .then((data) => {
+      if (esp32Client && esp32Client.readyState === WebSocket.OPEN) {
+        console.log("Sending processed data back to ESP32");
+        console.dir(data, { depth: null });
+        esp32Client.send(JSON.stringify(data.feature_vector));
+      } else {
+        console.log("ESP32 client is not connected.");
+      }
+    })
+    .catch((error) => {
+      console.error("Error fetching from Extracting feature server:", error);
+    });
 }
 
 wsServer.on("connection", (ws, req) => {
@@ -76,31 +59,21 @@ wsServer.on("connection", (ws, req) => {
   esp32Client = ws;
 
   ws.on("message", (data) => {
-    buffer.push(data); // Store data in buffer
+    buffer.push(data);
 
-    // Gửi dữ liệu cho tất cả client khác
     connectedClients.forEach((client) => {
       if (client !== esp32Client && client.readyState === WebSocket.OPEN) {
-        client.send(data); // Gửi dữ liệu cho client khác
+        client.send(data);
       }
     });
   });
 });
 
-// Function to write data to a file every 10 seconds
+// Function to process data every 1 second
 setInterval(() => {
   if (buffer.length > 0) {
-    const timestamp = Date.now();
-    const filePath = path.join(__dirname, `../data/audio_${timestamp}.bin`);
-
-    fs.writeFile(filePath, Buffer.concat(buffer), (err) => {
-      if (err) console.error("Error writing file:", err);
-      else {
-        console.log(`Saved audio to ${filePath}`);
-        processFileAndSendBack(filePath);
-      }
-    });
-
+    const audioData = Buffer.concat(buffer);
+    processFileAndSendBack(audioData);
     buffer = [];
   }
 }, 1000);
@@ -108,9 +81,38 @@ setInterval(() => {
 // HTTP stuff
 app.use("/image", express.static("image"));
 app.use("/js", express.static("js"));
+app.use(express.json());
+
 app.get("/audio", (req, res) =>
   res.sendFile(path.resolve(__dirname, "./audio_client.html"))
 );
+
+// Add endpoint for speaker updates
+app.post("/update_speaker", (req, res) => {
+  const { speaker, confidence } = req.body;
+  console.log(
+    "Received speaker update:",
+    speaker,
+    "with confidence:",
+    confidence
+  );
+
+  // Broadcast to all web clients
+  connectedClients.forEach((client) => {
+    if (client !== esp32Client && client.readyState === WebSocket.OPEN) {
+      client.send(
+        JSON.stringify({
+          type: "speaker_update",
+          speaker: speaker,
+          confidence: confidence,
+        })
+      );
+    }
+  });
+
+  res.json({ status: "success" });
+});
+
 app.listen(HTTP_PORT, () =>
   console.log(`HTTP server listening at http://localhost:${HTTP_PORT}`)
 );

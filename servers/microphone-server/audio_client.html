@@ -31,6 +31,48 @@
       margin: 4px 2px;
       cursor: pointer;
     }
+
+    #message {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      background-color: #f5f5f5;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    #speaker {
+      font-size: 24px;
+      font-weight: 500;
+      padding: 15px;
+      border-radius: 8px;
+      background-color: white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+      display: inline-block;
+      min-width: 300px;
+      text-align: center;
+    }
+
+    .high-confidence {
+      color: #4caf50;
+      border-left: 5px solid #4caf50;
+    }
+
+    .low-confidence {
+      color: #ffa500;
+      border-left: 5px solid #ffa500;
+    }
+
+    .speaker-label {
+      font-weight: bold;
+      color: #666;
+    }
+
+    .confidence-value {
+      font-size: 0.8em;
+      color: #888;
+      margin-left: 10px;
+    }
   </style>
   <body>
     <h1>ESP32 + I²S Digital Microphone</h1>
@@ -52,6 +94,11 @@
       Continue Playing
     </button>
     <div id="graph"></div>
+
+    <div id="message">
+      <p id="speaker">Speaker:</p>
+    </div>
+
     <script>
       function addDarkmodeWidget() {
         new Darkmode().showWidget();
@@ -121,15 +168,36 @@
           inputCodec: "Int16",
           channels: 1,
           sampleRate: 16000,
-          // sampleRate: 44100,
         });
-        const WS_URL = "ws:///192.168.1.29:8888";
+        const WS_URL = "ws:///192.168.1.56:8888";
         var ws = new WebSocket(WS_URL);
         ws.binaryType = "arraybuffer";
         ws.addEventListener("message", function (event) {
-          if (continueBtn.disabled) {
-            player.feed(event.data);
-            worker.postMessage(event.data); // Remove if it makes the web browser slow.
+          try {
+            // Try to parse as JSON for speaker updates
+            const message = JSON.parse(event.data);
+            if (message.type === "speaker_update") {
+              const speakerElement = document.getElementById("speaker");
+              const confidencePercent = (message.confidence * 100).toFixed(2);
+
+              // Update the speaker display with new styling
+              speakerElement.innerHTML = `
+                <span class="speaker-label">Speaker:</span> 
+                ${message.speaker}
+                <span class="confidence-value">(${confidencePercent}% confidence)</span>
+              `;
+
+              // Add confidence-based styling
+              speakerElement.className =
+                message.confidence > 0.7 ? "high-confidence" : "low-confidence";
+              return;
+            }
+          } catch (e) {
+            // If not JSON, treat as audio data
+            if (continueBtn.disabled) {
+              player.feed(event.data);
+              worker.postMessage(event.data);
+            }
           }
         });
       };

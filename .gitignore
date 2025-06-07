@@ -6,6 +6,7 @@
 
 /servers/microphone-server/node_modules
 /servers/microphone-server/data
+/servers/data*
 
 .DS_Store
 __pycache__

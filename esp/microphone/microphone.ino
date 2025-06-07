@@ -2,6 +2,7 @@
 #include <driver/i2s.h>
 #include <ArduinoJson.h>
 #include <ArduinoWebsockets.h>
+#include <HTTPClient.h>
 
 #include <TensorFlowLite_ESP32.h>
 #include "tensorflow/lite/micro/all_ops_resolver.h"
@@ -21,11 +22,12 @@
 #define bufferLen 1024
 int16_t sBuffer[bufferLen];
 
-const char* ssid = "NHA TRO LE VAN VIET";  // WiFi SSID
-const char* password = "0902511322";       // WiFi Password
+const char* ssid = "NHA TRO LE VAN VIET";
+const char* password = "0902511322";
 
-const char* websocket_server_host = "192.168.1.29";
+const char* websocket_server_host = "192.168.1.56";
 const uint16_t websocket_server_port = 8888;  // <WEBSOCKET_SERVER_PORT>
+const uint16_t http_server_port = 8000;  // <HTTP_SERVER_PORT>
 
 // Tensor arena size (50 KB) - may need adjustment based on model requirements
 constexpr int kTensorArenaSize = 20 * 1024;
@@ -86,19 +88,58 @@ void predict(const float* features, size_t feature_size, const char* message) {
     return;
   }
 
-  // Interpret output (assuming two classes: "Anh ban than" and "Giang oi")
+  Serial.println("Output: ");
+  Serial.println(output->data.f[0]);
+  Serial.println(output->data.f[1]);
+  Serial.println(output->data.f[2]);
+  Serial.println("---------------");
   float prob_anh_ban_than = output->data.f[0];
-  float prob_giang_oi = output->data.f[1];
-  if (prob_anh_ban_than > prob_giang_oi) {
-    Serial.println("Predicted: Anh ban than");
+  float prob_background_noise = output->data.f[1];
+  float prob_giang_oi = output->data.f[2];
+  
+  float max_prob = max(max(prob_anh_ban_than, prob_giang_oi), prob_background_noise);
+  String max_var = "";
+  
+  if (max_prob == prob_anh_ban_than) {
+    max_var = "anh_ban_than";
+  } else if (max_prob == prob_giang_oi) {
+    max_var = "giang_oi"; 
   } else {
-    Serial.println("Predicted: Giang oi");
+    max_var = "background_noise";
   }
-  Serial.print("Probabilities - Anh ban than: ");
-  Serial.print(prob_anh_ban_than);
-  Serial.print(", Giang oi: ");
-  Serial.println(prob_giang_oi);
-  Serial.println();
+  
+  Serial.print("Largest probability: ");
+  Serial.print(max_prob, 6);
+  Serial.print(" from variable: ");
+  Serial.println(max_var);
+
+  // Send prediction result via HTTP POST
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String serverUrl = "http://" + String(websocket_server_host) + ":" + String(http_server_port) + "/update_speaker";
+    
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    
+    StaticJsonDocument<200> doc;
+    doc["speaker"] = max_var;
+    doc["confidence"] = max_prob;
+    
+    String jsonString;
+    serializeJson(doc, jsonString);
+    
+    int httpResponseCode = http.POST(jsonString);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("HTTP Response code: " + String(httpResponseCode));
+      Serial.println("Response: " + response);
+    } else {
+      Serial.println("Error sending HTTP POST request");
+    }
+    
+    http.end();
+  }
 }
 
 void onEventsCallback(WebsocketsEvent event, String data) {
@@ -150,7 +191,7 @@ void i2s_install() {
   // Set up I2S Processor configuration
   const i2s_config_t i2s_config = {
     .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
-    .sample_rate = 16000,  // Adjust if necessary
+    .sample_rate = 16000,
     .bits_per_sample = i2s_bits_per_sample_t(16),
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
@@ -164,11 +205,10 @@ void i2s_install() {
 }
 
 void i2s_setpin() {
-  // Set I2S pin configuration
   const i2s_pin_config_t pin_config = {
     .bck_io_num = I2S_SCK,
     .ws_io_num = I2S_WS,
-    .data_out_num = -1,  // Not used
+    .data_out_num = -1,
     .data_in_num = I2S_SD
   };
 
@@ -190,12 +230,17 @@ void loop() {
 
 void connectWiFi() {
   Serial.println("Connecting to wifi");
+  Serial.println("SSID: " + String(ssid));
+  Serial.println("Password: " + String(password));
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.println("wifi...");
   }
+
+  Serial.print("ESP32 local IP: ");
+  Serial.println(WiFi.localIP());
   Serial.println("");
   Serial.println("WiFi connected");
 }
@@ -204,6 +249,7 @@ void connectWSServer() {
   Serial.println("Connecting to websocket");
   client.onEvent(onEventsCallback);
   client.onMessage(onMessageCallback);
+  Serial.println("Host: " + String(websocket_server_host) + " Port: " + String(websocket_server_port));
   while (!client.connect(websocket_server_host, websocket_server_port, "/")) {
     delay(500);
     Serial.println("ws...");
@@ -220,7 +266,7 @@ void micTask(void* parameter) {
   while (1) {
     esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
     if (result == ESP_OK && isWebSocketConnected) {
-      client.sendBinary((const char*)sBuffer, bytesIn);  // Gửi dữ liệu nhị phân
+      client.sendBinary((const char*)sBuffer, bytesIn);
       vTaskDelay(5 / portTICK_PERIOD_MS);
     }
     vTaskDelay(5 / portTICK_PERIOD_MS);
